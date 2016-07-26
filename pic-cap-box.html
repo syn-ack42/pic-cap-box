@@ -1,0 +1,184 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../paper-icon-button/paper-icon-button.html">
+<!--
+`pic-cap-box`
+A user input element to select multiple pictures (or photos on a mobile device) which also displayes previews.
+The pictures selected by the user are returend as an array in a bound attribute.
+Pictures can be rescaled to reduce image size.
+
+@demo demo/index.html
+-->
+
+<dom-module id="pic-cap-box">
+  <template>
+    <style>
+      :host {
+        display: block;
+        width: inherit;
+        height: inherit;
+        overflow-y: scroll;
+      }
+      .photo_review_tile {
+        position: relative;
+        display: inline-block;
+
+        width: 80px;
+        height: 80px;
+
+        margin: 3px;
+        border-style: dashed;
+        border-width: thin;
+      }
+
+      .perview_img {
+        width: inherit;
+        height: inherit;
+        position: absolute;
+      }
+      .clear_button {
+        width: 40px;
+        height: 40px;
+        position: absolute;
+        top: 55%;
+        left: 55%;
+        background-color: white;
+        opacity: 0.8;
+      }
+    </style>
+      <template id='pictureTiles' is="dom-repeat" items="{{pictures}}" indexAs="{{index}}">
+          <div class='photo_review_tile' on-tap="_showFileDialog" picindex="{{index}}" >
+            <img src="[[_getImageData(pictures.*, index)]]" alt="" id="show-picture_{{index}}" class="perview_img" />
+            <paper-icon-button hidden="hidden" id="delete-picture_{{index}}" class="clear_button" icon="delete" title="delete" on-tap="_clearImageTapped" picindex="{{index}}"></paper-icon-button>
+          </div>
+          <input type="file" id="take-picture_{{index}}" accept="image/*" picindex="{{index}}" on-change='_pictureSelected' hidden='hidden' >
+      </template>
+      <canvas id="scale_picture_helper" width="[[xResolution]]" height="[[yResolution]]"></canvas>
+  </template>
+
+  <script>
+    Polymer({
+
+      is: 'pic-cap-box',
+
+      properties: {
+        /*Set the number of pictures the user may select*/
+        'maxNumberOfPictures': {
+            type: Number,
+            value: 1,
+          },
+        /*Bind this attribute to an array to receive the picatures as base64 encoded jpeg data URLs*/
+        'pictures': {
+          type: Array,
+          value: [],
+          reflectToAttribute: true,
+        },
+        /*Images will be rescaled to this pixel value on their shot edge. Defaults to 1280.*/
+        'longEdgePixels': {
+            type: Number,
+            value: 1280,
+        },
+        /*Images will be rescaled to this pixel value on their shot edge. Defaults to 1024.*/
+        'shortEdgePixels': {
+          type: Number,
+          value: 1024,
+        },
+      },
+      observers: [
+        '_maxNumPicChanged(maxNumberOfPictures)',
+      ],
+      _maxNumPicChanged: function(num) {
+        if (!this.pictures) {
+          this.pictures = [];
+        }
+        this.splice('pictures',0, this.pictures.length);
+        for (var i = 0; i < num; i++) {
+          this.unshift('pictures', null);
+        }
+      },
+      _pictureSelected: function(event) {
+        // Get a reference to the taken picture or chosen file
+        var files = event.target.files, file;
+
+        if (files && files.length > 0) {
+          file = files[0];
+          // Only process image files.
+          if (!file.type.match('image.*')) {
+            return;
+          }
+          var picIndex = event.currentTarget.picindex*1;
+          var reader = new FileReader();
+          var self = this;
+
+          // Capture the file information.
+          //TODO: Clean this up. I think there is no need for the function in a function thingy. (It was in the example.)
+          reader.onload = (function(theFile) {
+            return function(e) {
+              //rescaling, and updating the data in the "pictures" array (and tereby rendering the thumbnail)
+              //is currently done in the _resizedataURL() function.
+              //TODO: Should make the resizing a promise and the data update its "then()"
+              self._resizedataURL(e.target.result, self.shortEdgePixels, self.longEdgePixels, picIndex);
+              document.querySelector("#delete-picture_"+picIndex).hidden=false;
+            };
+          })(file);
+
+          // Read in the image file as a data URL.
+          reader.readAsDataURL(file);
+        }
+      },
+      _showFileDialog: function(event) {
+        var picIndex = event.currentTarget.picindex*1;
+        document.querySelector("#take-picture_"+picIndex).click();
+      },
+      _clearImageTapped: function(event) {
+        var picIndex = event.currentTarget.picindex*1;
+        this.set('pictures.'+ picIndex, null);
+        document.querySelector("#delete-picture_"+picIndex).hidden="hidden";
+        document.querySelector("#take-picture_"+picIndex).value = "";
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      //return the action image from the pictures array or a svg image of a "+" in a circle
+      //("change" is just the binding for the pictures array to allow observing by polymer)
+      _getImageData: function(change, index) {
+        return this.pictures[index]?this.pictures[index]:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgICA8cGF0aCBkPSJNMCAwaDQ4djQ4aC00OHoiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBmaWxsPSIjNjE2MTYxIiBkPSJNMjYgMTRoLTR2OGgtOHY0aDh2OGg0di04aDh2LTRoLTh2LTh6bS0yLTEwYy0xMS4wNSAwLTIwIDguOTUtMjAgMjBzOC45NSAyMCAyMCAyMCAyMC04Ljk1IDIwLTIwLTguOTUtMjAtMjAtMjB6bTAgMzZjLTguODIgMC0xNi03LjE4LTE2LTE2czcuMTgtMTYgMTYtMTYgMTYgNy4xOCAxNiAxNi03LjE4IDE2LTE2IDE2eiIvPgo8L3N2Zz4K';
+      },
+      //resize the picture
+      _resizedataURL: function(imageData, shortEdgePixels, longEdgePixels, wantedImageIndex) {
+          // We create an image to receive the Data URI
+          var img = document.createElement('img');
+          var self = this;
+
+          // When the event "onload" is triggered we can resize the image.
+          img.onload = function() {
+              // We create a canvas and get its context.
+              var canvas = document.createElement('canvas');
+              var context = canvas.getContext('2d');
+
+              // We set the dimensions at the wanted size.
+              if (this.width > this.height) {
+                canvas.width = longEdgePixels;
+                canvas.height = shortEdgePixels;
+                context.scale(longEdgePixels/this.width,shortEdgePixels/this.height);
+              }
+              else {
+                canvas.height = longEdgePixels;
+                canvas.width = shortEdgePixels;
+                context.scale(shortEdgePixels/this.width,longEdgePixels/this.height);
+              }
+
+              // We resize the image with the canvas method drawImage();
+              context.drawImage(this, 0, 0);
+
+              var dataURI = canvas.toDataURL('image/jpeg');
+
+              //update the pictures array
+              //TODO: This should not be done here but the resizing should be a promise and the data update its "then()"
+              self.set('pictures.'+ wantedImageIndex, dataURI);
+          };
+          // We put the Data URI in the image's src attribute
+          img.src = imageData;
+      },
+
+    });
+  </script>
+</dom-module>
