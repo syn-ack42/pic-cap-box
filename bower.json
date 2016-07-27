@@ -5,7 +5,8 @@
   "dependencies": {
     "polymer": "Polymer/polymer#^1.4.0",
     "iron-icon": "^1.0.9",
-    "paper-icon-button": "^1.1.2"
+    "paper-icon-button": "^1.1.2",
+    "prism": "^1.5.1"
   },
   "devDependencies": {
     "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",
