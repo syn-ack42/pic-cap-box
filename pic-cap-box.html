@@ -85,6 +85,7 @@ Pictures can be rescaled to reduce image size.
       },
       observers: [
         '_maxNumPicChanged(maxNumberOfPictures)',
+        '_updatePictureData(_pictures.*)'
       ],
       /*reset the  pictureData array and reinitilize the pictures array with the apporpriate number of "null"s */
       _maxNumPicChanged: function(num) {
@@ -118,16 +119,11 @@ Pictures can be rescaled to reduce image size.
           var self = this;
 
           // Capture the file information.
-          //TODO: Clean this up. I think there is no need for the function in a function thingy. (It was in the example.)
-          reader.onload = (function(theFile) {
-            return function(e) {
-              //rescaling, and updating the data in the "_pictures" array (and tereby rendering the thumbnail)
-              //is currently done in the _resizedataURL() function.
-              //TODO: Should make the resizing a promise and the data update its "then()"
-              self._resizedataURL(e.target.result, self.shortEdgePixels, self.longEdgePixels, picIndex);
-              document.querySelector("#delete-picture_"+picIndex).hidden=false;
-            };
-          })(file);
+          reader.onload = function(e) {
+            //rescaling, and updating the data in the "_pictures" array (and tereby rendering the thumbnail)
+            self._resizeAndStoreImage(e.target.result, self.shortEdgePixels, self.longEdgePixels, picIndex);
+            document.querySelector("#delete-picture_"+picIndex).hidden=false;
+          };
 
           // Read in the image file as a data URL.
           reader.readAsDataURL(file);
@@ -140,11 +136,9 @@ Pictures can be rescaled to reduce image size.
       _clearImageTapped: function(event) {
         var picIndex = event.currentTarget.picindex*1;
         this.set('_pictures.'+ picIndex, null);
-        this._updatePictureData();
 
         document.querySelector("#delete-picture_"+picIndex).hidden="hidden";
         document.querySelector("#take-picture_"+picIndex).value = "";
-        event.preventDefault();
         event.stopPropagation();
       },
       //return the action image from the _pictures array or a svg image of a "+" in a circle
@@ -152,8 +146,8 @@ Pictures can be rescaled to reduce image size.
       _getImageData: function(change, index) {
         return this._pictures[index]?this._pictures[index]:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgICA8cGF0aCBkPSJNMCAwaDQ4djQ4aC00OHoiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBmaWxsPSIjNjE2MTYxIiBkPSJNMjYgMTRoLTR2OGgtOHY0aDh2OGg0di04aDh2LTRoLTh2LTh6bS0yLTEwYy0xMS4wNSAwLTIwIDguOTUtMjAgMjBzOC45NSAyMCAyMCAyMCAyMC04Ljk1IDIwLTIwLTguOTUtMjAtMjAtMjB6bTAgMzZjLTguODIgMC0xNi03LjE4LTE2LTE2czcuMTgtMTYgMTYtMTYgMTYgNy4xOCAxNiAxNi03LjE4IDE2LTE2IDE2eiIvPgo8L3N2Zz4K';
       },
-      //resize the picture
-      _resizedataURL: function(imageData, shortEdgePixels, longEdgePixels, wantedImageIndex) {
+      //resize the picture and store it in the _pictures array
+      _resizeAndStoreImage: function(imageData, shortEdgePixels, longEdgePixels, wantedImageIndex) {
           // We create an image to receive the Data URI
           var img = document.createElement('img');
           var self = this;
@@ -182,9 +176,7 @@ Pictures can be rescaled to reduce image size.
               var dataURI = canvas.toDataURL('image/jpeg');
 
               //update the _pictures array
-              //TODO: This should not be done here but the resizing should be a promise and the data update its "then()"
               self.set('_pictures.'+ wantedImageIndex, dataURI);
-              self._updatePictureData();
           };
           // We put the Data URI in the image's src attribute
           img.src = imageData;
