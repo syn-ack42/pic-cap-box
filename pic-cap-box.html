@@ -105,6 +105,17 @@ Pictures can be rescaled to reduce image size.
           this.unshift('_pictures', null);
         }
       },
+      setPictures: function(pictures) {
+        if (pictures instanceof Array) {
+          this._pictures = pictures;
+          if (pictures.length < this.maxNumberOfPictures) {
+            for (var i = pictures.length; i < this.maxNumberOfPictures; i++) {
+              this.push('_pictures', null);
+            }
+          }
+          this._updatePictureData();
+        }
+      },
       _updatePictureData: function(){
         this.pictureData = [];
         var sumBytes = 0;
