@@ -51,12 +51,19 @@ Pictures can be rescaled to reduce image size.
         padding-right: 10px;
       }
     </style>
-      <template id='pictureTiles' is="dom-repeat" items="{{_pictures}}" indexAs="{{index}}">
+      <template id='pictureTiles' is="dom-repeat" items="[[pictureData]]" indexAs="{{index}}">
           <div class='photo_review_tile' on-tap="_showFileDialog" picindex="{{index}}" >
-            <img src="[[_getImageData(_pictures.*, index)]]" alt="" id="show-picture_{{index}}" class="perview_img" />
-            <paper-icon-button hidden="hidden" id="delete-picture_{{index}}" class="clear_button" icon="delete" title="delete" on-tap="_clearImageTapped" picindex="{{index}}"></paper-icon-button>
+            <img src="[[_getImageData(pictureData.*, index)]]" alt="" id="show-picture_{{index}}" class="perview_img" />
+            <paper-icon-button hidden&="{{!pictureData.index}}" id="delete-picture_{{index}}" class="clear_button" icon="delete" title="delete" on-tap="_clearImageTapped" picindex="{{index}}"></paper-icon-button>
           </div>
           <input type="file" id="take-picture_{{index}}" accept="image/*" picindex="{{index}}" on-change='_pictureSelected' hidden='hidden' >
+      </template>
+      <template id='addNewPictureTile' is="dom-if" if="{{!_maxPicReached(pictureData.*)}}" >
+          <div class='photo_review_tile' on-tap="_showFileDialog" >
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgICA8cGF0aCBkPSJNMCAwaDQ4djQ4aC00OHoiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBmaWxsPSIjNjE2MTYxIiBkPSJNMjYgMTRoLTR2OGgtOHY0aDh2OGg0di04aDh2LTRoLTh2LTh6bS0yLTEwYy0xMS4wNSAwLTIwIDguOTUtMjAgMjBzOC45NSAyMCAyMCAyMCAyMC04Ljk1IDIwLTIwLTguOTUtMjAtMjAtMjB6bTAgMzZjLTguODIgMC0xNi03LjE4LTE2LTE2czcuMTgtMTYgMTYtMTYgMTYgNy4xOCAxNiAxNi03LjE4IDE2LTE2IDE2eiIvPgo8L3N2Zz4K"
+                alt="" id="add-picture" class="perview_img" />
+          </div>
+          <input type="file" id="take-picture" accept="image/*" on-change='_pictureSelected' hidden='hidden' >
       </template>
       <div class="upload-size-box">[[_dataSize]]</div>
   </template>
@@ -72,11 +79,12 @@ Pictures can be rescaled to reduce image size.
             type: Number,
             value: 1,
           },
-        /*Bind this attribute to an array to receive the picatures as base64 encoded jpeg data URLs*/
+        /*Bind this attribute to an array to receive the pictures as base64 encoded jpeg data URLs*/
         'pictureData': {
           type: Array,
           value: [],
           notify: true,
+          readOnly: false
         },
         /*Images will be rescaled to this pixel value on their long edge.*/
         'longEdgePixels': {
@@ -94,35 +102,37 @@ Pictures can be rescaled to reduce image size.
       },
       observers: [
         '_maxNumPicChanged(maxNumberOfPictures)',
-        '_updatePictureData(_pictures.*)'
+        '_pictureDataChanged(pictureData.*)'
       ],
-      /*reset the  pictureData array and reinitilize the pictures array with the apporpriate number of "null"s */
-      _maxNumPicChanged: function(num) {
-        this._pictures = [];
-        this.pictureData =[];
-
-        for (var i = 0; i < num; i++) {
-          this.unshift('_pictures', null);
-        }
-      },
+      /*set pictureData. Muste be an array of base64 url encoded images*/
       setPictures: function(pictures) {
         if (pictures instanceof Array) {
-          this._pictures = pictures;
-          if (pictures.length < this.maxNumberOfPictures) {
-            for (var i = pictures.length; i < this.maxNumberOfPictures; i++) {
-              this.push('_pictures', null);
-            }
+          this.set('pictureData',[]);
+          for (var i=0;i<pictures.length;i++) {
+            this.push('pictureData', pictures[i]);
           }
-          this._updatePictureData();
         }
       },
-      _updatePictureData: function(){
-        this.pictureData = [];
+      /*reset the  pictureData array */
+      _maxNumPicChanged: function() {
+        this.set('pictureData',[]);
+      },
+      _maxPicReached: function() {
+        if (this.pictureData instanceof Array) {
+          return (this.pictureData.length >= this.maxNumberOfPictures);
+        }
+        else {
+          return false;
+        }
+      },
+      _pictureDataChanged: function() {
+        this._calcPictureDataSize();
+      },
+      _calcPictureDataSize: function() {
         var sumBytes = 0;
-        for (var i=0; i<this._pictures.length; i++) {
-          if (this._pictures[i]) {
-            this.pictureData.push(this._pictures[i]);
-            sumBytes += this._pictures[i].length;
+        for (var i=0; i<this.pictureData.length; i++) {
+          if (this.pictureData[i]) {
+            sumBytes += this.pictureData[i].length;
           }
         }
         if (this.pictureData.length > 0) {
@@ -142,7 +152,13 @@ Pictures can be rescaled to reduce image size.
           if (!file.type.match('image.*')) {
             return;
           }
-          var picIndex = event.currentTarget.picindex*1;
+          var picIndex = event.currentTarget.picindex;
+          if ((picIndex == null) || (picIndex == undefined)) {
+            picIndex = this.pictureData.length;
+          }
+          else {
+            picIndex = event.currentTarget.picindex*1;
+          }
           var reader = new FileReader();
           var self = this;
 
@@ -150,7 +166,6 @@ Pictures can be rescaled to reduce image size.
           reader.onload = function(e) {
             //rescaling, and updating the data in the "_pictures" array (and tereby rendering the thumbnail)
             self._resizeAndStoreImage(e.target.result, picIndex);
-            document.querySelector("#delete-picture_"+picIndex).hidden=false;
           };
 
           // Read in the image file as a data URL.
@@ -158,21 +173,25 @@ Pictures can be rescaled to reduce image size.
         }
       },
       _showFileDialog: function(event) {
-        var picIndex = event.currentTarget.picindex*1;
-        document.querySelector("#take-picture_"+picIndex).click();
+        var picIndex = event.currentTarget.picindex;
+        if ((picIndex == null) || (picIndex == undefined)) {
+          document.querySelector("#take-picture").value = '';
+          document.querySelector("#take-picture").click();
+        }
+        else {
+          document.querySelector("#take-picture_"+picIndex).value = '';
+          document.querySelector("#take-picture_"+picIndex).click();
+        }
       },
       _clearImageTapped: function(event) {
         var picIndex = event.currentTarget.picindex*1;
-        this.set('_pictures.'+ picIndex, null);
-
-        document.querySelector("#delete-picture_"+picIndex).hidden="hidden";
-        document.querySelector("#take-picture_"+picIndex).value = "";
+        this.splice('pictureData', picIndex,1);
         event.stopPropagation();
       },
       //return the action image from the _pictures array or a svg image of a "+" in a circle
       //("change" is just the binding for the _pictures array to allow observing by polymer)
       _getImageData: function(change, index) {
-        return this._pictures[index]?this._pictures[index]:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgICA8cGF0aCBkPSJNMCAwaDQ4djQ4aC00OHoiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBmaWxsPSIjNjE2MTYxIiBkPSJNMjYgMTRoLTR2OGgtOHY0aDh2OGg0di04aDh2LTRoLTh2LTh6bS0yLTEwYy0xMS4wNSAwLTIwIDguOTUtMjAgMjBzOC45NSAyMCAyMCAyMCAyMC04Ljk1IDIwLTIwLTguOTUtMjAtMjAtMjB6bTAgMzZjLTguODIgMC0xNi03LjE4LTE2LTE2czcuMTgtMTYgMTYtMTYgMTYgNy4xOCAxNiAxNi03LjE4IDE2LTE2IDE2eiIvPgo8L3N2Zz4K';
+        return this.pictureData[index]?this.pictureData[index]:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgICA8cGF0aCBkPSJNMCAwaDQ4djQ4aC00OHoiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBmaWxsPSIjNjE2MTYxIiBkPSJNMjYgMTRoLTR2OGgtOHY0aDh2OGg0di04aDh2LTRoLTh2LTh6bS0yLTEwYy0xMS4wNSAwLTIwIDguOTUtMjAgMjBzOC45NSAyMCAyMCAyMCAyMC04Ljk1IDIwLTIwLTguOTUtMjAtMjAtMjB6bTAgMzZjLTguODIgMC0xNi03LjE4LTE2LTE2czcuMTgtMTYgMTYtMTYgMTYgNy4xOCAxNiAxNi03LjE4IDE2LTE2IDE2eiIvPgo8L3N2Zz4K';
       },
       //resize the picture and store it in the _pictures array
       _resizeAndStoreImage: function(imageData, wantedImageIndex) {
@@ -196,8 +215,9 @@ Pictures can be rescaled to reduce image size.
 
               var dataURI = canvas.toDataURL('image/jpeg');
 
-              //update the _pictures array
-              self.set('_pictures.'+ wantedImageIndex, dataURI);
+              //update the pictureData array
+              self.splice('pictureData', wantedImageIndex,1,dataURI);
+
           };
           // We put the Data URI in the image's src attribute
           img.src = imageData;
