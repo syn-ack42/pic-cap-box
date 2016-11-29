@@ -2,6 +2,9 @@
 
 A user input elemnt to select multiple pictures (or photos on a mobile device) which also displayes previews.
 
+## Docs & Demo
+https://syn-ack42.github.io/pic-cap-box/components/pic-cap-box/
+
 ## Install the Polymer-CLI
 
 First, make sure you have the [Polymer CLI](https://www.npmjs.com/package/polymer-cli) installed. Then run `polymer serve` to serve your application locally.
